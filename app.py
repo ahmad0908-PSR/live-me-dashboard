@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from gspread_dataframe import get_as_dataframe
 from google.oauth2.service_account import Credentials
+import json
 import time
 
 # ------------------------------------
@@ -11,9 +12,11 @@ import time
 @st.cache_data(ttl=60)  # Refresh every 60 seconds
 def load_sheet(sheet_id, worksheet_name):
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    credentials = Credentials.from_service_account_file(
-        "service_account.json", scopes=scopes
-    )
+
+    # Load credentials from Streamlit Secrets instead of file
+    gcp_info = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+    credentials = Credentials.from_service_account_info(gcp_info, scopes=scopes)
+
     client = gspread.authorize(credentials)
     sheet = client.open_by_key(sheet_id)
     worksheet = sheet.worksheet(worksheet_name)
@@ -69,15 +72,12 @@ WORKSHEET_NAME = "QC_Log"
 
 # Force refresh cache when button clicked
 if refresh_now:
-    # Clear cached data for this function
     load_sheet.clear()
     st.success("Cache cleared! Fetching fresh data...")
     time.sleep(0.3)
-    # Rerun the app (new API)
     try:
         st.rerun()
     except AttributeError:
-        # Fallback for very old Streamlit versions
         st.experimental_rerun()
 
 try:
@@ -109,7 +109,6 @@ try:
     with tab1:
         st.subheader("Overview Dashboard")
         st.write("Define your KPIs later.")
-
         st.metric("Total Records", len(filtered_df))
 
     # -------- Tab 2
@@ -128,7 +127,7 @@ try:
             monthly = tmp["_month"].value_counts().sort_index()
             st.line_chart(monthly)
         else:
-            st.info("No detected (parsed) date column. We'll wire this up when you share your real column names.")
+            st.info("No detected (parsed) date column.")
 
     # -------- Tab 3
     with tab3:
